@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+
+# Local env
+.venv/
+.env
+
+# Benchmark outputs
+outputs/
+tmp/
