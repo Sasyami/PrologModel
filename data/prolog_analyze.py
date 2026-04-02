@@ -59,7 +59,7 @@ def is_complex_prolog(content: str,
     
     return True
 
-@DeprecationWarning
+
 def annotate_prolog_with_llm(content: str, max_retries: int = 2) -> str:
     """
     Аннотирует Prolog-код с помощью LLM через системную команду ollama.
@@ -70,16 +70,30 @@ def annotate_prolog_with_llm(content: str, max_retries: int = 2) -> str:
     # Ограничиваем размер контента
     content_preview = content
     
-    prompt = f"""Ты — эксперт по SWI-Prolog 9.x. Твоя задача: проанализировать Prolog-файл и вернуть структурированную аннотацию в формате JSON.
+    prompt = f"""
+Ты — технический писатель. Твоя задача: посмотреть на Prolog-код и написать краткое ТЕХНИЧЕСКОЕ ЗАДАНИЕ (ТЗ), которое заказчик мог бы отправить программисту.
+
+Описывай ЧТО нужно сделать, а не КАК реализовано. Не упоминай имена предикатов или переменные.
 
 Формат ответа (строго JSON, без markdown):
-{
-  "task": "Подробное описание задачи (3-5 предложений). Что делает код, какие данные обрабатывает, какой результат возвращает.",
-  "domain": "область применения (списки, графы, семья, парсинг, арифметика...)",
-  "imports": ["library(...)"],
-  "compatibility": "swi-9-compatible|needs-update|legacy",
-  "complexity": "beginner|intermediate|advanced"
-}
+{{
+  "description": "Подробное описание задачи (3-5 предложений). Что делает код, какие данные обрабатывает, какой результат возвращает.",
+  "domain": ["список", "использованных", "конструкций", "Prolog"]
+}}
+
+Допустимые значения для domain:
+- "facts" — факты (предикаты без тела)
+- "recursion" — рекурсивные правила
+- "arithmetic" — арифметика (is, +, -, *, /)
+- "list_processing" — обработка списков [H|T]
+- "findall" — сбор решений (findall/3, bagof/3, setof/3)
+- "dcg" — грамматика (--> , phrase/2)
+- "clpfd" — ограничения (#=, in, labeling)
+- "cut" — отсечение (!)
+- "negation" — отрицание (\\+, not/1)
+- "io" — ввод/вывод (write, format, read)
+- "modules" — модули (use_module, module/2)
+- "meta" — мета-программирование (call/1, =..)
 
 ### ПРИМЕР:
 
@@ -108,17 +122,9 @@ generation_count(X, Y, N) :-
     N is N1 + 1.
 #### Выход:
 {{
-"task": "Моделирование семейных отношений и родословных связей. Код определяет факты о прямых родительских связях между людьми (атомы-имена). Реализован рекурсивный поиск предков через цепочку родителей, сбор всех потомков конкретного человека в список с помощью findall/3, и подсчёт количества поколений (расстояния) между двумя людьми через арифметические вычисления.",
-"domain": "family_relations",
-"imports": ["library(lists)"],
-"compatibility": "swi-9-compatible",
-"complexity": "intermediate"
-}}
-
-Файл который необходимо проанализировать:
-{content_preview}
-    """
-
+"description": "Система для навигации по иерархическим данным. Хранит информацию о прямых связях между объектами. Требуется реализовать рекурсивный поиск всех предков узла, сбор полного списка потомков и вычисление расстояния (глубины) между двумя связанными узлами. Входные данные: идентификаторы узлов. Выходные данные: булево, список узлов, целое число.",
+"domain": ["facts", "recursion", "arithmetic", "findall", "modules"]
+}}"""
     model_name = os.getenv("OLLAMA_MODEL", "llama3")  # По умолчанию llama3
 
     for attempt in range(max_retries):
@@ -207,60 +213,16 @@ def process_prolog_file(file_path: Path, repo_path: str, repo_name: str) -> Tupl
         
         
         # 4. Создаем промпт с полным контекстом
-        context_str = "КОНТЕКСТ РЕПОЗИТОРИЯ:\n\n"
+        context_str = content
         
         if 'README' in repo_context:
-            context_str += "=== README ===\n" + repo_context['README'] + "\n\n"
+            context_str += "КОНТЕКСТ РЕПОЗИТОРИЯ:\n\n" + repo_context['README'] + "\n\n"
         
-        
-        
-        
-        prompt = f"""{context_str}
+        annotation = annotate_prolog_with_llm(context_str,3)
 
-Проанализируй этот Prolog-код в контексте всего репозитория. Учти README, другие файлы и структуру проекта.
-
-АНАЛИЗ ДОЛЖЕН ВКЛЮЧАТЬ:
-1. Общее назначение файла в рамках проекта
-2. Связи с другими файлами репозитория
-3. Основные предикаты и их роль в системе
-4. Архитектурные паттерны и логические конструкции
-5. Как файл вписывается в общую архитектуру проекта
-
-Ответ: кратко и информативно, 200-250 слов, на русском языке."""
-
-        # 5. Выполняем аннотацию через Ollama
-        annotation = ""
-        
-        for attempt in range(3):
-                try:
-                    response = requests.post(
-                        "http://localhost:11434/api/generate",
-                        json={
-                            "model":  os.getenv("OLLAMA_MODEL"),
-                            "prompt": prompt,
-                            "stream": False,
-                            
-                        },
-                        timeout=60
-                    )
-                    
-                    if response.status_code == 200:
-                        result = response.json()
-                        annotation = result.get('response', '').strip()
-                        break
-                    else:
-                        print(f"   ⚠️ Ошибка LLM (попытка {attempt + 1}): {response.status_code}")
-                        time.sleep(3)
-                        
-                except requests.exceptions.RequestException as e:
-                    print(f"   ⚠️ Ошибка подключения (попытка {attempt + 1}): {e}")
-                    time.sleep(3)
-                except Exception as e:
-                    print(f"   ⚠️ Ошибка аннотации (попытка {attempt + 1}): {e}")
-                    time.sleep(3)
         
         
-        # 6. Формируем информацию о файле
+        
         file_info = {
             'path': str(file_path),
             'filename': file_path.name,

@@ -236,11 +236,11 @@ if __name__ == "__main__":
     ranges.reverse()
     d = []
     test_value = 0
-    d = get_prolog_repos(max_pages=1000, per_page=30,min_stars=225)
+    d = get_prolog_repos(max_pages=1000, per_page=10,min_stars=225)
     for s,e in ranges:
         if len(d)>test_value:
             break
-        d.extend(get_prolog_repos(max_pages=1000, per_page=30, min_stars=s, max_stars=e))
+        d.extend(get_prolog_repos(max_pages=1000, per_page=10, min_stars=s, max_stars=e))
         
 
       # Уменьшаем для тестирования
