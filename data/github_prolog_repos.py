@@ -79,6 +79,7 @@ def get_prolog_repos(
                 
                 elif response.status_code >= 400:
                     print(f"❌ Ошибка API {response.status_code}: {response.text}")
+                    end_of_pages = True
                     break  # Не повторяем клиентские ошибки
                 
                 # Сетевые ошибки и таймауты

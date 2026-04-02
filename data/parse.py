@@ -235,7 +235,7 @@ if __name__ == "__main__":
     ranges = list(zip(range(5,200,25),range(30,225,25)))
     ranges.reverse()
     d = []
-    test_value = 0
+    test_value = 3000
     d = get_prolog_repos(max_pages=1000, per_page=10,min_stars=225)
     for s,e in ranges:
         if len(d)>test_value:
