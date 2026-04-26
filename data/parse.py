@@ -184,6 +184,15 @@ def process_repos(
     
     for i, repo in enumerate(repos, 1):
         repo_name = repo['full_name']
+        
+      
+        safe_name = repo_name.replace('/', '_')  # Безопасная замена для ФС
+        target_path = os.path.join(output_dir, safe_name)
+        
+        if os.path.exists(target_path):
+            print(f"[{i}/{len(repos)}] Пропускаем {repo_name} — уже обработан")
+            continue
+            
         print(f"\n[{i}/{len(repos)}] Обработка: {repo_name}")
         print("=" * 60)
         
@@ -198,7 +207,6 @@ def process_repos(
         annotated_files = analyze_and_annotate_repo(downloaded_path, repo_name)
         
         
-        # 4. Удаляем исходный репозиторий
         try:
             shutil.rmtree(downloaded_path)
             print(f"🗑️ Удалён исходный: {downloaded_path}")
@@ -214,7 +222,7 @@ def process_repos(
     print(f"\n🎯 Итоги:")
     print(f"   Всего обработано: {len(repos)}")
     print(f"   Сохранено с аннотациями: {len(results)}")
-    total_annotated = sum(r['annotated_files_count'] for r in results)
+    total_annotated = sum(r.get('annotated_files_count', 0) for r in results)
     print(f"   Всего аннотированных файлов: {total_annotated}")
     print(f"   Папка с результатами: {os.path.abspath(output_dir)}")
     
@@ -235,12 +243,12 @@ if __name__ == "__main__":
     ranges = list(zip(range(5,200,25),range(30,225,25)))
     ranges.reverse()
     d = []
-    test_value = 3000
-    d = get_prolog_repos(max_pages=1000, per_page=10,min_stars=225)
+    test_value = 2000
+    d = get_prolog_repos(max_pages=100, per_page=30,min_stars=225)
     for s,e in ranges:
         if len(d)>test_value:
             break
-        d.extend(get_prolog_repos(max_pages=1000, per_page=10, min_stars=s, max_stars=e))
+        d.extend(get_prolog_repos(max_pages=100, per_page=30, min_stars=s, max_stars=e))
         
 
       # Уменьшаем для тестирования

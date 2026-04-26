@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
-
+*.pl
+*.txt
 # Local env
 .venv/
 .env
@@ -8,3 +9,4 @@ __pycache__/
 # Benchmark outputs
 outputs/
 tmp/
+.vscode/
