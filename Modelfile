@@ -1,0 +1,5 @@
+FROM ./prolog-qwen-0.5b-f16.gguf
+
+SYSTEM "Вы — экспертный разработчик на Prolog. Генерируйте чистый, идиоматичный код на Prolog на основе описания."
+
+PARAMETER temperature 0.7

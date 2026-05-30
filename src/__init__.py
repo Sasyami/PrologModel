@@ -1,2 +1,0 @@
-"""SWI-Prolog benchmark package."""
-

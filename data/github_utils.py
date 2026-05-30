@@ -1,10 +1,14 @@
 import os
-import requests
 import zipfile
 from pathlib import Path
 from typing import Optional
 import shutil
 import time
+
+try:
+    import requests
+except ImportError:  # pragma: no cover - optional during offline tests
+    requests = None
 
 def download_github_repo(
     repo_url: str, 
@@ -14,6 +18,9 @@ def download_github_repo(
     remove_zip: bool = True,
     max_retries: int = 3  # Добавляем параметр для количества попыток
 ) -> Optional[str]:
+    if requests is None:
+        raise RuntimeError("requests is required to download GitHub repositories")
+
     """
     Скачивает репозиторий с GitHub в указанную папку.
     

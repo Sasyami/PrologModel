@@ -1,0 +1,6 @@
+data/repos/
+data/annotated_repos/
+llama.cpp/
+src/prolog_model/
+src/prolog_merged/
+prolog-qwen-0.5b-f16.gguf
