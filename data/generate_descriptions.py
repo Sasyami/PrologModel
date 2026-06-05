@@ -19,6 +19,8 @@ from data.pipeline_constants import (
     ANNOTATED_REPOS_DIR,
     DEDUP_COSINE_THRESHOLD,
     DUPLICATE_LOG_PATH,
+    INSTRUCTION_FEW_SHOT_EXAMPLES,
+    INSTRUCTION_OPENING_STYLE_HINTS,
     INSTRUCTION_PROMPT_LINES,
     INSTRUCTION_PROMPT_VERSION,
     INSTRUCTION_README_CONTEXT_LINE,
@@ -42,7 +44,34 @@ from data.pipeline_utils import (
 
 
 def build_instruction_prompt(code: str, readme_text: str = "") -> str:
-    prompt = [*INSTRUCTION_PROMPT_LINES, "", "Код файла:", code.strip()]
+    style_hint = INSTRUCTION_OPENING_STYLE_HINTS[
+        hash(code.strip()) % len(INSTRUCTION_OPENING_STYLE_HINTS)
+    ]
+    prompt = [*INSTRUCTION_PROMPT_LINES, style_hint]
+
+    for index, (example_code, example_instruction) in enumerate(
+        INSTRUCTION_FEW_SHOT_EXAMPLES,
+        start=1,
+    ):
+        prompt.extend(
+            [
+                "",
+                f"Пример {index}.",
+                "Код:",
+                example_code,
+                "Описание:",
+                example_instruction,
+            ]
+        )
+
+    prompt.extend(
+        [
+            "",
+            "Теперь опиши следующий файл.",
+            "Код файла:",
+            code.strip(),
+        ]
+    )
 
     if readme_text:
         prompt.extend(
@@ -71,7 +100,7 @@ def generate_instruction(
             "model": model,
             "prompt": build_instruction_prompt(code, readme_text),
             "stream": False,
-            "temperature": 0.1,
+            "temperature": 0.2,
         },
         timeout=LLM_TIMEOUT_SEC,
         headers={"Content-Type": "application/json"},
@@ -99,6 +128,34 @@ def _candidate_json_paths(annotated_root: Path) -> list[Path]:
     metas = [(path, load_json(path)) for path in json_paths]
     metas.sort(key=lambda item: metadata_sort_key(item[1]))
     return [path for path, _ in metas]
+
+
+def _collect_generation_work(
+    annotated_root: Path,
+    runtime: TrainingModelRuntime,
+    ollama_model: str,
+    force: bool,
+) -> tuple[list[dict[str, Any]], list[Path]]:
+    ready_metas: list[dict[str, Any]] = []
+    pending_paths: list[Path] = []
+
+    for meta_path in _candidate_json_paths(annotated_root):
+        meta = load_json(meta_path)
+        pl_path = meta_path.with_suffix(".pl")
+        txt_path = meta_path.with_suffix(".txt")
+        if _can_skip_hydration(
+            meta,
+            runtime=runtime,
+            ollama_model=ollama_model,
+            pl_path=pl_path,
+            txt_path=txt_path,
+            force=force,
+        ):
+            ready_metas.append(meta)
+            continue
+        pending_paths.append(meta_path)
+
+    return ready_metas, pending_paths
 
 
 def _format_duration(total_seconds: float) -> str:
@@ -229,12 +286,18 @@ def generate_file_descriptions(
     force: bool = False,
 ) -> dict[str, int]:
     runtime = TrainingModelRuntime()
-    kept: list[dict[str, Any]] = []
-    candidate_paths = _candidate_json_paths(annotated_root)
+    ready_metas, candidate_paths = _collect_generation_work(
+        annotated_root=annotated_root,
+        runtime=runtime,
+        ollama_model=ollama_model,
+        force=force,
+    )
+    kept: list[dict[str, Any]] = list(ready_metas)
     total_candidates = len(candidate_paths)
     started_at = time.monotonic()
     stats = {
         "total": total_candidates,
+        "ready_seeded": len(ready_metas),
         "kept": 0,
         "duplicates": 0,
         "ready": 0,
@@ -248,6 +311,7 @@ def generate_file_descriptions(
 
     print("=== Description generation ===")
     print(f"candidates: {total_candidates}")
+    print(f"ready_seeded: {len(ready_metas)}")
 
     for index, meta_path in enumerate(candidate_paths, start=1):
         progress_prefix = _build_progress_prefix(index, total_candidates, started_at)
@@ -320,6 +384,7 @@ def generate_file_descriptions(
 
     print("\n=== Annotation summary ===")
     print(f"candidates: {stats['total']}")
+    print(f"ready_seeded: {stats['ready_seeded']}")
     print(f"kept: {stats['kept']}")
     print(f"ready_reused: {stats['ready']}")
     print(f"generated: {stats['generated']}")

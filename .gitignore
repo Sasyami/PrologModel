@@ -1,0 +1,26 @@
+__pycache__/
+*.pyc
+*.pl
+*.txt
+!requirements.txt
+*.gguf
+# Local env
+.venv/
+.env
+.continue/
+.cursor/
+.vscode/
+
+# Benchmark outputs
+output/
+outputs/
+tmp/
+src/prolog_merged/
+src/prolog_model/
+llama.cpp/
+
+# Large local datasets that should stay out of tooling context
+data/repos/
+data/annotated_repos/
+data/duplicate_log.jsonl
+data/stats.db
