@@ -132,30 +132,17 @@ def _candidate_json_paths(annotated_root: Path) -> list[Path]:
 
 def _collect_generation_work(
     annotated_root: Path,
-    runtime: TrainingModelRuntime,
-    ollama_model: str,
     force: bool,
-) -> tuple[list[dict[str, Any]], list[Path]]:
-    ready_metas: list[dict[str, Any]] = []
+) -> list[Path]:
     pending_paths: list[Path] = []
 
     for meta_path in _candidate_json_paths(annotated_root):
-        meta = load_json(meta_path)
-        pl_path = meta_path.with_suffix(".pl")
         txt_path = meta_path.with_suffix(".txt")
-        if _can_skip_hydration(
-            meta,
-            runtime=runtime,
-            ollama_model=ollama_model,
-            pl_path=pl_path,
-            txt_path=txt_path,
-            force=force,
-        ):
-            ready_metas.append(meta)
+        if txt_path.exists() and not force:
             continue
         pending_paths.append(meta_path)
 
-    return ready_metas, pending_paths
+    return pending_paths
 
 
 def _format_duration(total_seconds: float) -> str:
@@ -286,18 +273,15 @@ def generate_file_descriptions(
     force: bool = False,
 ) -> dict[str, int]:
     runtime = TrainingModelRuntime()
-    ready_metas, candidate_paths = _collect_generation_work(
+    candidate_paths = _collect_generation_work(
         annotated_root=annotated_root,
-        runtime=runtime,
-        ollama_model=ollama_model,
         force=force,
     )
-    kept: list[dict[str, Any]] = list(ready_metas)
+    kept: list[dict[str, Any]] = []
     total_candidates = len(candidate_paths)
     started_at = time.monotonic()
     stats = {
         "total": total_candidates,
-        "ready_seeded": len(ready_metas),
         "kept": 0,
         "duplicates": 0,
         "ready": 0,
@@ -311,7 +295,6 @@ def generate_file_descriptions(
 
     print("=== Description generation ===")
     print(f"candidates: {total_candidates}")
-    print(f"ready_seeded: {len(ready_metas)}")
 
     for index, meta_path in enumerate(candidate_paths, start=1):
         progress_prefix = _build_progress_prefix(index, total_candidates, started_at)
@@ -384,7 +367,6 @@ def generate_file_descriptions(
 
     print("\n=== Annotation summary ===")
     print(f"candidates: {stats['total']}")
-    print(f"ready_seeded: {stats['ready_seeded']}")
     print(f"kept: {stats['kept']}")
     print(f"ready_reused: {stats['ready']}")
     print(f"generated: {stats['generated']}")
